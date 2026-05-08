@@ -1,130 +1,88 @@
-## bmap-cli 百度地图开放平台 CLI 工具
+# bmap-cli Skills
 
-`bmap-cli` 是一个围绕百度地图开放平台封装的命令行工具 + Skill 集合，用于在本地一键完成：
+bmap-cli 百度地图开放平台 AI 助手 Skills，供 Claude、Cursor 等在使用百度地图相关 API 时加载，以提供准确的 API 说明、AK 管理流程与代码示例。
 
-- **CLI 安装与环境配置**
-- **百度地图相关 Skills 安装**
-- **MCP（Model Context Protocol）配置安装/更新**
-- **AK（访问密钥）获取与管理**
+## 包含的 Skill
 
-它配合本目录下的 `SKILL.md` 一起工作，使得在触发该 Skill 的百度地图开发工作流中，可以做到“零手动、强约束、可追溯”。
+| Skill | 说明 |
+|-------|------|
+| bmap-cli | 百度地图开放平台 CLI 工具入口。凡涉及百度地图开发、生成地图相关 HTML/代码/demo、调用地图 API，必须第一时间触发此 Skill，先完成 CLI 安装、Skills 注册、MCP 配置与 AK 获取流程。支持：自动安装配置、用户账户管理、AK 管理、个性化地图样式管理、API 消费量/配额查询、地点搜索、路线导航、地址解析等。 |
 
----
+## 安装方式
 
-## 适用场景
+任选以下一种方式安装即可。
 
-只要用户出现以下任一需求，就会自动触发本 Skill 及 `bmap-cli`：
+### 方式一：npx skills add（推荐）
 
-- **地点 / POI 搜索**、周边搜索
-- **驾车 / 步行 / 骑行 / 公交路线规划与导航**
-- **地址解析（地名 → 坐标）或逆地理编码（坐标 → 地址）**
-- **天气查询、路况、沿途事件等 WebAPI 能力**
-- **BMapGL / JSAPI WebGL 前端地图开发**
-- **WebAPI 服务端调用（路线规划、距离矩阵、轨迹等）**
-- **个性化地图样式的查询、创建与管理**
-- **百度地图开放平台相关的安装、初始化、AK 管理等操作**
+若你的环境支持 skills CLI，可用一条命令安装本仓库的 skills：
 
-**核心原则**：一旦涉及“百度地图 + 调用接口/生成代码/生成 Demo/嵌入 HTML”，都应该先让 `bmap-cli` 完成配置与 AK 准备，再开始写任何业务代码。
+```bash
+npx skills add baidu-maps/bmap-cli-skills
+```
 
----
+会将本仓库中的全部 skills 安装到当前环境的 skills 目录。
 
-## 核心流程概览
+### 方式二：手动安装
 
-Skill 在被触发后，会按照 `SKILL.md` 中约定的流程，全自动执行以下步骤（具备幂等性，已完成的步骤会自动跳过）：
+**第一步：获取仓库**
 
-1. **检查并安装 CLI**
-   - 通过 `curl` 下载对应平台的 `bmap-cli` 可执行文件到 `~/bin`
-   - 确保 `~/bin` 加入 `PATH`
-2. **安装或更新百度地图 Skills**
-   - 执行：
+克隆本仓库：
 
-     ```bash
-     "$BMAP_CLI" skills install
-     ```
+```bash
+git clone https://github.com/baidu-maps/bmap-cli-skills.git
+cd bmap-cli-skills
+```
 
-   - 对输出结果中的命令逐条、严格执行，而不是只展示输出文本
-3. **安装或更新 MCP 配置**
-   - 执行：
+或从 [Releases](https://github.com/baidu-maps/bmap-cli-skills/releases) 下载附件 `bmap-cli-skills.zip` 后解压：
 
-     ```bash
-     "$BMAP_CLI" mcp install
-     ```
+```bash
+unzip bmap-cli-skills.zip
+```
 
-   - 将输出中的 MCP 配置**深度合并**写入本地 MCP 配置文件，而不是覆盖已有条目
-4. **根据用户需求获取合适的 AK，并进入业务回答阶段**
-   - 分析当前需求是前端 JSAPI/BMapGL、后端 WebAPI，还是两者兼有
-   - 只获取实际需要类型的 AK
-   - 通过：
+**第二步：注册 Skill**
 
-     ```bash
-     "$BMAP_CLI" ak list 2>&1
-     ```
+将 `skills/` 目录下的 `bmap-cli` 链接或复制到当前环境对应的 skills 目录。
 
-     获取 AK 列表并挑选最合适的一条
-   - 在聊天中以遮掩形式声明所选 AK，再把**原始 AK 字符串**写入生成的代码文件
+**Claude Desktop（本地）**
 
----
+Skills 目录一般为：`~/.claude/skills/`
 
-## AK 使用规范（极其重要）
+注册（软链，推荐）：
 
-根据 `SKILL.md` 要求，任何与 AK 相关的操作必须遵守以下约束：
+```bash
+ln -sfn "$(pwd)/skills/bmap-cli" ~/.claude/skills/bmap-cli
+```
 
-- **代码中必须使用 `ak list` 输出的原始完整 AK 值**
-  - 禁止手动推断、补全、修改或简写
-  - 禁止在代码中留下“请替换 AK”之类占位符
-- **聊天展示必须遮掩 AK**
-  - 展示格式为：`前4位****后4位`，例如：`ByM8****KMxw`
-  - 推荐的聊天声明格式：
+或直接把 `skills/bmap-cli` 文件夹复制到 `~/.claude/skills/` 下。
 
-    ```text
-    > 已获取 AK：{前4位}****{后4位}（{app_type}，{app_name}，白名单：{b_referers}）
-    ```
+**Cursor**
 
-- **不得将 AK 通过 echo/print 输出到终端日志**
-  - 代码里可读，但执行日志中不应明文暴露
-- **切换账户后必须全部替换 AK**
-  - 通过 `bmap-cli login` 切换账户后：
-    - 重新 `ak list`，替换当前会话中所有旧 AK
-    - 重新执行 `mcp install` 和 `skills install`
-    - 提醒用户：历史会话生成的代码无法自动追踪，需要人工排查替换
+Skills 目录一般为：`~/.cursor/skills/`
 
----
+注册（软链，推荐）：
 
-## 与其他工具的协同
+```bash
+ln -sfn "$(pwd)/skills/bmap-cli" ~/.cursor/skills/bmap-cli
+```
 
-`bmap-cli` Skill 只是入口，它通常会联合以下组件一起工作：
+或直接把 `skills/bmap-cli` 文件夹复制到 `~/.cursor/skills/` 下。
 
-- **`baidu-maps-docs` MCP**：用于查询百度地图开放平台官方文档、参数说明、错误码等
-- **`baidu-map-jsapi-gl` Skill**：用于生成 BMapGL / JSAPI WebGL 前端地图示例、交互逻辑、覆盖物展示等
-- **`baidu-map-webapi` Skill**：用于生成/调用 WebAPI 代码（如路线规划、路径预估、天气、距离矩阵等）
-- **`knowledge-rag` MCP**：用于查询团队内部与百度地图相关 SOP、最佳实践、常见问题解答等
+## 如何使用
 
-Skill 会根据用户提问自动选择合适的组合方式，你只需用自然语言描述需求即可。
+在支持 Skills 的客户端里，当你的问题涉及「百度地图」「BMapGL」「JSAPI」「WebAPI」「POI 搜索」「路线规划」「地址解析」「天气」「地图样式」等时，助手会优先参考本仓库中对应 skill 的文档来回答，从而给出更贴合百度地图开放平台的代码与用法。
 
----
+## 仓库结构
 
-## 常见使用姿势示例
+```text
+.
+├── skills/
+│   └── bmap-cli/                # 百度地图 CLI 入口 Skill
+│       ├── SKILL.md             # Skill 入口与索引
+└── README.md
+```
 
-以下是一些用户自然语言需求示例，这些问题会自动触发 `bmap-cli` 及相关 Skills：
+`SKILL.md` 中会列出该 Skill 下所有参考文档，便于 AI 按需读取。
 
-- “帮我写一个基于 **BMapGL** 的 3D 地图 Demo，可以切换卫星图层”
-- “给我一个调用 **驾车路线 WebAPI** 的 Python 脚本，输入起终点坐标，输出距离和耗时”
-- “我想查一下某个小区附近 2 公里内的加油站，并画在地图上”
-- “帮我把现有的 Web 前端改成用百度地图 JSAPI WebGL，并添加自定义 Marker”
-- “现在这个 AK 报错 `AK非法`，帮我排查下可能的原因”
+## 许可
 
-在这些场景中，`bmap-cli` 会先确保 CLI / Skills / MCP / AK 都准备就绪，再去生成最终代码或查询结果。
-
----
-
-## 开发者提示
-
-- **不要直接依赖模型训练数据中的百度地图用法示例**
-  - 所有文档类、用法类问题应通过 `baidu-maps-docs` / 对应 Skill 实时获取
-- **不要省略命令输出**
-  - 登录链接、错误堆栈、命令输出禁止以“… +N lines” 形式截断，必须完整展示，便于排查问题
-- **配置是可复用的**
-  - 一旦某个环境中 `bmap-cli` / Skills / MCP / AK 配置成功，在同一用户、同一环境下后续会话可以直接复用，无需重复安装
-
-如果你想扩展支持新的百度地图业务能力（如周边检索、离线缓存、自定义图层等），建议以本 README 与 `SKILL.md` 为基准，补充新的子命令和 Skill，并统一走 `bmap-cli` 入口管理。
-
+MIT
