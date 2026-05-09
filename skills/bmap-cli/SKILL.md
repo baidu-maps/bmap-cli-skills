@@ -94,14 +94,14 @@ export PATH="$HOME/bin:$PATH"
 "$BMAP_CLI" style list 2>&1
 ```
 
-- `user_style_list` 中有合适项 → 取其 `style_id`  
-- 否则从 `template_list` 选最匹配模板（优先 `need_business_accredit: false`），再创建：
+- **先查后建（强制）**：必须先完整读取 `style list` 输出，在 `user_style_list` 中逐项比对并优先复用已存在且满足需求的样式；**禁止**未检查就直接 `style create`。  
+- 仅当 `user_style_list` **确实无满足项** 时，才允许从 `template_list` 选最匹配模板（优先 `need_business_accredit: false`）并创建：
 
 ```bash
 "$BMAP_CLI" style create --tpl-id <tpl_id> 2>&1
 ```
 
-取返回的 `style_id`，在代码中**仅**使用 `styleId`，示例：
+`style_id` **只能**取自 CLI 原始输出（`style list` 的已有项或 `style create` 的返回结果）；**禁止**手写、猜测、拼接或编造 `style_id`。在代码中**仅**使用该真实 `style_id` 的 `styleId` 方式，示例：
 
 ```javascript
 map.setMapStyleV2({ styleId: '从 CLI 获取的 style_id' });
