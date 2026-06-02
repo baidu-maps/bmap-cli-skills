@@ -1,7 +1,6 @@
 ---
 name: bmap-cli
-description: 百度地图开放平台 CLI。凡涉及百度地图开发、HTML/demo、WebAPI/BMapGL、AK/个性化地图样式/配额等，须先触发本 skill 并完成环境与 AK 流程，再查文档或写代码。涵盖：CLI 安装、Skills/MCP 配置、账户与 AK、个性化地图样式、地点/路线/地址解析等；同时支持百度地图 Agent Plan（无需开发者账户，可完成找地点、规划路线、查天气、解析 / 反解析地址等能力）。
-version: 1.0.1
+description: 百度地图开放平台 CLI。凡涉及百度地图开发、HTML/demo、WebAPI/BMapGL、AK/个性化地图样式/配额等，须先触发本 skill 并完成环境与 AK 流程，再查文档或写代码。涵盖：CLI 安装、Skills/MCP 配置、账户与 AK、个性化地图样式、地点/路线/地址解析等；同时支持百度地图 Agent Plan（无需开发者账户，提供大模型友好调用的地图工具，支持语义化 AI 搜索、语义化 AI 路线规划、地理编码与逆地理编码、天气查询）。
 ---
 
 # bmap-cli 百度地图开放平台工具
@@ -12,10 +11,22 @@ version: 1.0.1
 
 满足任一条即启用本 skill：
 
-- 地点 / POI 搜索、路线导航、地址或坐标解析、天气查询（含 Agent Plan 场景）
-- 个性化地图样式查询或创建
-- 百度地图开发（WebAPI、BMapGL、JSAPI）、工具安装与配置
-- 生成含百度地图的 HTML、demo 或代码
+| 触发场景 | 典型行为 |
+|------|------|
+| 语义化 AI 搜索、语义化 AI 路线规划、地理编码与逆地理编码、天气查询 | 调用 `baidu-ai-map` skill 直接完成地理任务 |
+| 个性化地图样式查询或创建 | 执行 `style list` / `style create` 命令 |
+| 百度地图开发（WebAPI、BMapGL、JSAPI）、工具安装与配置 | 进入环境准备流程，安装 CLI / Skills / MCP |
+| 生成含百度地图的 HTML、demo 或代码 | 获取 AK、查询文档并交付可运行代码 |
+
+## 核心能力
+
+| 能力 | 说明 |
+|------|------|
+| 环境管理 | CLI 安装、Skills / MCP 幂等配置，登录与版本更新全自动处理 |
+| AK 管理 | 查询现有 AK、按需创建浏览器端或服务端 AK，安全遮掩展示 |
+| 地图样式管理 | 查询个性化样式列表、从模板创建新样式，提供真实 `style_id` |
+| 百度地图 Agent Plan | 通过 `baidu-ai-map` skill（提供大模型友好调用的地图工具）完成语义化 AI 搜索、语义化 AI 路线规划、地理编码与逆地理编码、天气查询 |
+| 代码生成 | 交付含真实 AK 与样式 ID 的 BMapGL / WebAPI 可运行代码 |
 
 ## 执行原则
 
@@ -33,9 +44,51 @@ version: 1.0.1
 2. **配置审阅**：`skills install` / `mcp install` 的终端输出若包含待执行指令或待写入配置，须先**完整展示给用户审阅**；获得明确同意后，再逐条执行或写入；未经确认禁止自动变更配置。
 3. **版本更新**：任何命令输出若包含「发现新版本」字样及对应更新命令，须向用户展示该更新命令并征得同意，完成后再继续后续步骤。
 4. **MCP 合并**：MCP 配置须与本地已有配置**深度合并**，勿覆盖无关条目；若输出为「已安装，跳过」则跳过该步。
-5. **登录处理**：任何命令输出若包含「未登录」错误，须告知用户需要登录并征得明确同意；获得同意后立即自行执行 `"$BMAP_CLI" login`（CLI 会自动打开浏览器，等待用户在浏览器点击授权即可），完成后重试原命令；禁止将登录命令抛给用户手动执行。
+5. **登录处理**：
 
-## 执行流程
+   - **用户已登录**：若用户明确表示已登录，直接执行目标命令；仅当命令返回「未登录」错误时才进入登录流程。
+   - **绝对禁止**：抛给用户手动执行；包裹 timeout/nohup；放后台（`&`）或管道（`|`）；用 `sleep`/`ps`/`find`/`for`/`while` 轮询检查登录状态或等待配置文件生成；查找 token 文件、环境变量或任何凭证存储位置；同一问题反复自我确认超过一次。
+
+   任何命令输出若包含「未登录」错误，须告知用户并征得明确同意后，立即自行执行 `"$BMAP_CLI" login`。
+
+   > **模型常见错误（必须避免）**
+   > ```bash
+   > # 错误写法（timeout / 后台 / 重定向 / 管道）
+   > timeout 60 "$BMAP_CLI" login
+   > "$BMAP_CLI" login &
+   > "$BMAP_CLI" login > /tmp/out.txt 2>&1 &
+   > "$BMAP_CLI" login | head -20
+   > **唯一正确写法**：`"$BMAP_CLI" login`
+
+   `login` 是**引导用户完成浏览器授权的人机协作流程**，不是模型获取 token 的技术脚本。执行后立刻输出授权 URL 并进入轮询等待；token 由 CLI 内部管理，模型不需要知道也不应该去查找。**模型不得等待命令结束**，必须在第一时间提取 URL 并以独立代码块展示给用户，同时告知用户在浏览器中点击授权：
+
+   ```
+   请在浏览器中打开以下链接完成授权（完整链接，禁止省略或截断）。如已完成登录授权，可忽略此链接：
+   <完整 URL>
+   ```
+
+   URL 展示后即表示模型已完成本分工作，剩余时间由用户在浏览器侧完成授权；CLI 内部管理 5 分钟轮询超时，模型无需干预。
+
+## 工作流程
+
+### 工作流总览
+
+```
+触发 skill
+    ↓
+阶段一（幂等）: ① 安装 CLI → ② skills install → ③ mcp install
+    ↓ 输出含「未登录」? → bmap-cli login（前台阻塞，禁止 timeout/&）→ 重试后继续
+    ↓
+阶段二（响应请求）
+    ├─ 语义化 AI 任务 ────────── baidu-ai-map skill（唯一入口）
+    ├─ 查文档   ──────────────── baidu-maps-docs MCP
+    └─ 写代码（严格四步）
+         ① 确定 AK 类型（浏览器端 / 服务端）
+         ② 需样式? → style list 先查，无则 style create
+         ③ ak list
+         ④ 选/建 AK → 写入代码交付
+横切：任何命令含「发现新版本」→ 展示更新命令，征得同意后继续
+```
 
 ### 阶段一：环境准备
 
@@ -49,16 +102,56 @@ version: 1.0.1
 
 ```bash
 mkdir -p ~/bin
-BMAP_OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
-BMAP_ARCH="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
-export BMAP_CLI="$HOME/bin/bmap-cli-${BMAP_OS}-${BMAP_ARCH}"
+```
 
-if [[ ! -x "$BMAP_CLI" ]]; then
-  curl -fL "https://open-agent-cli.bj.bcebos.com/cli/bmap-cli-${BMAP_OS}-${BMAP_ARCH}" \
-    -o "$BMAP_CLI" && chmod +x "$BMAP_CLI"
-fi
+```bash
+uname -s
+```
 
-grep -q 'HOME/bin' ~/.zshenv 2>/dev/null || echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshenv
+```bash
+uname -m
+```
+
+根据上两步输出确定平台后缀（勿用管道拼接探测）：
+
+- `BMAP_OS`：`Darwin`→`darwin`，`Linux`→`linux`，其余转小写
+- `BMAP_ARCH`：`x86_64`→`amd64`，`aarch64`→`arm64`，其余保持原样
+
+将 `<BMAP_OS>`、`<BMAP_ARCH>` 替换为实际值后执行：
+
+```bash
+export BMAP_CLI="$HOME/bin/bmap-cli-<BMAP_OS>-<BMAP_ARCH>"
+```
+
+幂等检查：若已可执行则跳过下载与赋权。
+
+```bash
+test -x "$BMAP_CLI"
+```
+
+上一条失败（退出码非 0）时，依次执行：
+
+```bash
+curl -fL "https://open-agent-cli.bj.bcebos.com/cli/bmap-cli-<BMAP_OS>-<BMAP_ARCH>" -o "$BMAP_CLI"
+```
+
+```bash
+chmod +x "$BMAP_CLI"
+```
+
+PATH 幂等：先检查 `~/.zshenv` 是否已含 `HOME/bin`。
+
+```bash
+grep -q 'HOME/bin' ~/.zshenv
+```
+
+上一条失败时执行：
+
+```bash
+echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshenv
+```
+
+```bash
 export PATH="$HOME/bin:$PATH"
 ```
 
@@ -101,11 +194,13 @@ chmod 600 <mcp_config_path>
 
 | 用户需求 | 来源 |
 |------|------|
-| **直接执行地理任务**（找地点、规划路线、查天气、解析 / 反解析地址） | `baidu-ai-map` skill |
+| **直接执行地理任务**（语义化 AI 搜索、语义化 AI 路线规划、地理编码与逆地理编码、天气查询） | `baidu-ai-map` skill |
 | 查询 API 文档（接口参数、限制、定价说明） | `baidu-maps-docs` MCP |
 | 生成调用地图的代码（HTML、JSAPI 示例、WebAPI 集成） | `baidu-map-jsapi-gl` 或 `baidu-map-webapi` skills |
 
 > **强制**：`baidu-ai-map` 是直接执行地理任务的**唯一**入口，`baidu-map-webapi` 不得作为其替代。若 `baidu-ai-map` 尚未加载，须告知用户重启 Claude Code 后重试，**不得**以任何其他 skill 降级替代。
+>
+> **Agent Plan 先查后建**：执行 `baidu-ai-map` 前，须先 `"$BMAP_CLI" ap list` 查询现有 Agent Plan。若列表非空则复用已有 plan；**仅当列表为空时才允许** `"$BMAP_CLI" ap create`。**严禁**未查询直接 `ap create`，该命令会重置已有 plan。
 
 #### 代码类请求（需生成或修改代码/文件）
 
@@ -178,7 +273,6 @@ map.setMapStyleV2({ styleId: '从 CLI 获取的 style_id' });
 - 用户已明确发出查询指令（如"查询这个 AK 的调用量/配额"）时，应按"核验目标 -> 精确取字段 -> 立即执行查询 -> 返回结果"直接执行；除非命令受阻（权限/网络/登录失效），否则禁止只道歉或反问。
 - `前4位****后4位` 等形式**仅**用于聊天说明，**禁止**写入源码。
 - 写入代码前，在对话中先发一行声明（固定格式）：
-
   ```
   > 已获取 AK：{前4位}****{后4位}（{app_type}，{app_name}，白名单：{b_referers}）
   ```
@@ -195,13 +289,9 @@ map.setMapStyleV2({ styleId: '从 CLI 获取的 style_id' });
 
 ### 输出规范
 
-登录链接、报错堆栈、命令结果禁止用「… +N 行」类截断，须完整原样给出。
+登录链接（授权 URL）必须完整原样展示给用户，禁止省略、截断、折叠或以任何形式隐藏；报错堆栈、命令结果同理，禁止用「… +N 行」类截断。展示 URL 时须同时说明当前登录状态（如「已登录成功，URL 仅供参考」），避免用户误以为需要重新操作。
 
 ### 配置复用与会话管理
 
 - **复用**：本环境已成功配置后，同一会话后续可直接复用，不必重复安装。
-- **切换账户**（如执行 `bmap-cli login` 后）：旧账户 AK 全部作废，须依次：
-  1. 重新 `ak list`，替换**本会话**已生成代码中的 AK
-  2. 重新 `bmap-cli mcp install`，**展示输出给用户确认**后更新 MCP 中的 AK
-  3. 重新 `bmap-cli skills install` 更新 skills 中的 AK
-  4. 提醒用户：**其他历史会话**产出的文件需自行排查替换，助手无法感知跨会话写入的文件
+- **切换账户**（如 `bmap-cli login` 后）旧 AK 全部作废，须依次：① `ak list` 替换本会话代码中的 AK；② `bmap-cli mcp install`（展示输出确认后更新）；③ `bmap-cli skills install` 更新 skills；④ 提醒用户自行替换其他历史会话文件。
